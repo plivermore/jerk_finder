@@ -15,6 +15,7 @@
 *.so
 *.dylib
 *.dll
+*.Info.plist
 
 # Fortran module files
 *.mod
@@ -30,3 +31,8 @@
 *.exe
 *.out
 *.app
+
+# Python
+.ipynb_checkpoints*
+
+jerks.cpython-38-darwin.so.dSYM/*

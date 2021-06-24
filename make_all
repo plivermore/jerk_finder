@@ -1,0 +1,3 @@
+gfortran -c Fortran/sort.F90
+gfortran -c Fortran/subs.F90
+f2py3 -c Fortran/Jerks.F90 sort.o subs.o -m jerks
