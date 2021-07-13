@@ -46,7 +46,7 @@ jerk_times = [4600,5750,2920, 1915, 6490,7300,7620,7840,8880,9673,10590,12620,13
 jerk_number = 8 # in Python indexing
 time_yearly = np.arange(jerk_times[jerk_number]-200,jerk_times[jerk_number]+200+1)
 
-run_components=[0]
+run_components=[0 1 2]
 SV_error = 10
 SV_MIN = -400
 SV_MAX = 400 
@@ -60,8 +60,8 @@ CP_NBINS = 1*int(TIMES_MAX - TIMES_MIN) #one per year
 CP_hist_save = np.zeros( (len(run_components),CP_NBINS), dtype=int )
 
 radius = 6371.
-phis = np.linspace(-180,160 ,2)
-thetas = np.linspace(-80,80,2) + 90
+phis = np.linspace(-180,160 ,18)
+thetas = np.linspace(-80,80,9)+90
 theta_grid, phi_grid = np.meshgrid(thetas, phis)
 thetaphi_g = np.transpose(np.vstack((theta_grid.flatten(), phi_grid.flatten())))
 npt = np.shape(thetaphi_g)[0]
@@ -103,7 +103,7 @@ def my_calc_par(thetaphi_g):
         build_marginal_intensity = True
         RUNNING_MODE = 1
         burn_in = 10000
-        NSAMPLE = 200000 + burn_in
+        NSAMPLE = 2000000 + burn_in
         Acceptance_rates=np.zeros(4)
         AV = np.zeros(discretise_size,dtype=float)
         SUP = np.zeros(discretise_size,dtype=float)
