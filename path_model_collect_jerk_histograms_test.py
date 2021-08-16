@@ -148,4 +148,4 @@ if __name__ == '__main__':
 import pickle
 with open("Jerk9_MP.results", "wb") as fp:   #Pickling
     pickle.dump(results[0], fp)
-
+print( results[0] )

@@ -57,6 +57,7 @@ MODULE Jerks
 ! ENSEMBLE_MODE: the ensemble modal model (array size: discretize_size)
 !
 ! CHANGE_POINTS: a histogram of the timing of internal vertices (array, size CP_BINS)
+! Each model can add at most 1 to each bin; so normalised over all models this is a posterior probability.
 !
 ! MARGINAL_DENSITY: a 2D marginal density for the linear ensemble or zeros (if not calculated); (array, size: discretise_size,NBINS)
 !
@@ -110,7 +111,7 @@ REAL(dp), ALLOCATABLE :: interpolated_signal(:), TIME(:), PTS_NEW(:,:)
 INTEGER, ALLOCATABLE, DIMENSION(:) :: IND_MIN, IND_MAX, ORDER
 INTEGER, ALLOCATABLE :: discrete_history(:,:)
 LOGICAL :: CALC_CREDIBLE
-INTEGER :: input_random_seed
+INTEGER :: input_random_seed, BIN_INDEX_PREVIOUS
 INTEGER, ALLOCATABLE :: SEED(:)
 
 IF( credible > 0.0_dp) THEN
@@ -535,8 +536,11 @@ ENDIF !CALC_CREDIBLE
 N_changepoint_hist(k)=N_changepoint_hist(k) + 1
 
 
-!calculate the histogram on change points
+!calculate the histogram on change points, adding a 1 to the bin if there is a change point.
 
+!Only allow at most one changepoint in any bin - this is so the bin count normalised by the number of models is the probability of a changepoint.  
+
+BIN_INDEX_PREVIOUS = -1
 DO i=1,k
 BIN_INDEX = FLOOR( (pt(i,1)-TIMES_MIN)/REAL(TIMES_MAX-TIMES_MIN, KIND = dp) * CP_NBINS ) + 1
 IF( BIN_INDEX < 0 .OR. BIN_INDEX > CP_NBINS) THEN
@@ -545,7 +549,13 @@ PRINT*, ' MODEL POINT ', I, ' VALUE ',pt(i,1)
 PRINT*, 'TIMES MIN/MAX ', TIMES_MIN, TIMES_MAX
 STOP
 ENDIF
+! If it's the first bin to consider then add a 1 to the bin; also add a 1 to the bin if the bin is different to that already considered. Update the previous bin index when done.
+
+IF( BIN_INDEX_PREVIOUS == -1 .OR. BIN_INDEX_PREVIOUS .NE. BIN_INDEX) THEN
 CHANGE_POINTS(BIN_INDEX) = CHANGE_POINTS(BIN_INDEX) + 1
+BIN_INDEX_PREVIOUS = BIN_INDEX
+ENDIF
+
 enddo
 
 
