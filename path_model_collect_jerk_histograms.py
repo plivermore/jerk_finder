@@ -15,7 +15,7 @@ import chaosmagpy as cp
 # Download the spherical harmonic time-series output from the path model
 import os.path
 if not os.path.exists('Gauss_Bsurf.mat'): 
-    os.exec('wget http://morpho.ipgp.fr/4DEarth/Gauss_Bsurf.mat')
+    os.system('wget --no-verbose http://morpho.ipgp.fr/4DEarth/Gauss_Bsurf.mat')
 
 # %%
 # import the dataset
@@ -46,7 +46,10 @@ jerk_times = [4600,5750,2920, 1915, 6490,7300,7620,7840,8880,9673,10590,12620,13
 jerk_number = 8 # in Python indexing
 time_yearly = np.arange(jerk_times[jerk_number]-200,jerk_times[jerk_number]+200+1)
 
-run_components=[0 1 2]
+run_components=[0, 1, 2]
+
+ncomp = len(run_components)
+
 SV_error = 10
 SV_MIN = -400
 SV_MAX = 400 
@@ -59,17 +62,19 @@ NUM_DATA = len(TIMES)
 CP_NBINS = 1*int(TIMES_MAX - TIMES_MIN) #one per year
 CP_hist_save = np.zeros( (len(run_components),CP_NBINS), dtype=int )
 
+ntheta = 16
+nphi = 8 
+
 radius = 6371.
-phis = np.linspace(-180,160 ,18)
-thetas = np.linspace(-80,80,9)+90
+phis = np.linspace(-180, 180 , nphi, endpoint=False, dtype=float)
+thetas = np.linspace(-80,80, ntheta, endpoint=True, dtype=float) + 90.
 theta_grid, phi_grid = np.meshgrid(thetas, phis)
 thetaphi_g = np.transpose(np.vstack((theta_grid.flatten(), phi_grid.flatten())))
 npt = np.shape(thetaphi_g)[0]
 
 def my_calc_par(thetaphi_g):
-    print(thetaphi_g)
-    npt = np.shape(thetaphi_g)
-    print(npt)
+
+    npt = np.shape(thetaphi_g)[0]
     loc_results = []
     theta_l = thetaphi_g[0]
     phi_l = thetaphi_g[1]
@@ -123,23 +128,23 @@ def my_calc_par(thetaphi_g):
 
         # save the model
         fac = (NSAMPLE-burn_in)/THIN
-        loc_results.append([theta_l, phi_l,i,CP_hist_run[:]/fac ])
-
+        loc_results.append([theta_l, phi_l,i,CP_hist_run[:]/fac])
     return loc_results
 
-results = []
 
 nproc = int(os.getenv("OMP_NUM_THREADS"))
+
 if __name__ == '__main__':
     if nproc > 1:
         with Pool(nproc) as p:
-            loc_results = p.map(my_calc_par, thetaphi_g) 
-            results.append( loc_results )
+            loc_results = p.map(my_calc_par, thetaphi_g)
+            results = np.reshape( loc_results, (npt*ncomp, 4))
     else:
+        results = []
         for ipt in range(npt):
             loc_results = my_calc_par( thetaphi_g[ipt]) 
             results.append( loc_results )
 
 import pickle
 with open("Jerk9.results", "wb") as fp:   #Pickling
-    pickle.dump(results, fp)
+        pickle.dump(results, fp)
