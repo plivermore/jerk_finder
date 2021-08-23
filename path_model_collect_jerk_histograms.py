@@ -82,7 +82,7 @@ def my_calc_par(thetaphi_g):
     Br_yearly,Btheta_yearly, Bphi_yearly = np.interp(time_yearly, time, Br ), np.interp(time_yearly, time, Btheta ), np.interp(time_yearly, time, Bphi )
     Bx_dot, By_dot, Bz_dot = -np.gradient(Btheta_yearly,time_yearly), np.gradient(Bphi_yearly,time_yearly), -np.gradient(Br_yearly,time_yearly)
     for i in run_components:
-        print(i)
+        #print(i)
         if i == 0:
             SV = Bx_dot
         elif i == 1:
@@ -147,4 +147,4 @@ if __name__ == '__main__':
 
 import pickle
 with open("Jerk9.results", "wb") as fp:   #Pickling
-        pickle.dump(results, fp)
+    pickle.dump(results, fp)
