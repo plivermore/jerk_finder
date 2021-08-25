@@ -11,13 +11,15 @@ jerk_number = 8
 jerk_times = [4600,5750,2920, 1915, 6490,7300,7620,7840,8880,9673,10590,12620,13411,13546]
 # sample every year
 time_yearly = np.arange(jerk_times[jerk_number]-200,jerk_times[jerk_number]+200+1)
+t0 = jerk_times[jerk_number]
 
-with open("Jerk9_5x5_20M.results", "rb") as fp:   # Unpickling
+filename = "Jerk"+str(jerk_number+1)+"_5x5_20M.results"
+with open(filename, "rb") as fp:   # Unpickling
      results = pickle.load(fp)
 
-# make plot of number of jerks over 8880 +/- 30 years
+# make plot of number of jerks over t0 +/- 30 years
 
-height_threshold = 0.2
+height_threshold = 0.3
 distance_threshold = 3
 
 x_theta, x_phi,x_count = [],[],[]
@@ -32,19 +34,19 @@ for j in range(len(results)):
     if component == 0:
         x_theta.append(theta); x_phi.append(phi)
         peaks,_ = find_peaks( CP, height = height_threshold, distance = distance_threshold)
-        x_count.append(len( [time_yearly[i] for i in peaks if (time_yearly[i] < 8880+30 and time_yearly[i] > 8880-30)]))
+        x_count.append(len( [time_yearly[i] for i in peaks if (time_yearly[i] < t0+30 and time_yearly[i] > t0-30)]))
 
     if component == 1:
         y_theta.append(theta); y_phi.append(phi)
         peaks,_ = find_peaks( CP, height = height_threshold, distance = distance_threshold)
-        y_count.append(len( [time_yearly[i] for i in peaks if (time_yearly[i] < 8880+30 and time_yearly[i] > 8880-30)]))
+        y_count.append(len( [time_yearly[i] for i in peaks if (time_yearly[i] < t0+30 and time_yearly[i] > t0-30)]))
     
     if component == 2:
         z_theta.append(theta); z_phi.append(phi)
         peaks,_ = find_peaks( CP, height = height_threshold, distance = distance_threshold)
-        z_count.append(len( [time_yearly[i] for i in peaks if (time_yearly[i] < 8880+30 and time_yearly[i] > 8880-30)]))
+        z_count.append(len( [time_yearly[i] for i in peaks if (time_yearly[i] < t0+30 and time_yearly[i] > t0-30)]))
     t = len( [time_yearly[i] for i in peaks 
-                 if (time_yearly[i] < 8880+30 and time_yearly[i] > 8880-30)])
+                 if (time_yearly[i] < t0+30 and time_yearly[i] > t0-30)])
     if t >= 3:
                  print(str(t) + ' jerks found at theta = ' + str(theta) + ' phi = ' + str(phi) + ' component = ' + str(component))
 max_count = 4#max(max(x_count),max(y_count),max(z_count))
@@ -60,19 +62,19 @@ marker_size = 10.
 
 for i in range(3):
     if i == 0:
-        cax = axes[0].scatter(x_phi,90.-np.array(x_theta), s = marker_size, c=x_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
+        cax = axes[i].scatter(x_phi,90.-np.array(x_theta), s = marker_size, c=x_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
         axes[i].set_title(r'$dB_X/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(x_count),np.sum(np.array(x_count)>0)))
         gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=True, 
                       linewidth=2, color='gray', alpha=0.5, linestyle='--')
         gl.xlabels_top = False
     elif i == 1:
-        cax = axes[1].scatter(y_phi,90.-np.array(y_theta), s = marker_size, c=y_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
+        cax = axes[i].scatter(y_phi,90.-np.array(y_theta), s = marker_size, c=y_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
         axes[i].set_title(r'$dB_Y/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(y_count),np.sum(np.array(y_count)>0)))
         gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=True, 
                       linewidth=2, color='gray', alpha=0.5, linestyle='--')
         gl.xlabels_top = False
     elif i == 2:
-        cax = axes[2].scatter(z_phi,90.-np.array(z_theta), s = marker_size, c=z_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
+        cax = axes[i].scatter(z_phi,90.-np.array(z_theta), s = marker_size, c=z_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
         axes[i].set_title(r'$dB_Z/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(z_count),np.sum(np.array(z_count)>0)))
         gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=True, 
                       linewidth=2, color='gray', alpha=0.5, linestyle='--')
@@ -94,7 +96,9 @@ cbar = f.colorbar(cax, ax=cb_ax, orientation = 'horizontal')
 cb_ax.set_axis_off()
 
 cbar.set_ticks(range(0,max_count+1))
-f.savefig('Jerk9_' + str(int(10*height_threshold)) + '_' + str(distance_threshold) + '.pdf',bbox_inches = 'tight')
+outfname = 'Jerk'+str(jerk_number+1)+'_' + str(int(10*height_threshold)) + '_' + str(distance_threshold)
+f.savefig(outfname + '.pdf',bbox_inches = 'tight')
+f.savefig(outfname + '.png',bbox_inches = 'tight')
 plt.close()
 
 #Plot against timeseries at particular location
@@ -163,4 +167,6 @@ for j in range(len(results)):
 
         plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.5)
 
-plt.savefig('Jerk9_ts_theta90_phi80.pdf')
+outfname = 'Jerk'+str(jerk_number+1)+'_ts_theta90_phi80'
+plt.savefig(outfname+'.pdf')
+plt.savefig(outfname+'.png')

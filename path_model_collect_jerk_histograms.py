@@ -43,7 +43,7 @@ jerk_times = [4600,5750,2920, 1915, 6490,7300,7620,7840,8880,9673,10590,12620,13
 # Assume 10% error
 # Collect all the histograms into a list and save to disk - this takes a while...
 # AF attempt at a multithreading approach 
-jerk_number = 8 # in Python indexing
+jerk_number = 5 # in Python indexing
 time_yearly = np.arange(jerk_times[jerk_number]-200,jerk_times[jerk_number]+200+1)
 
 run_components=[0, 1, 2]
@@ -62,10 +62,10 @@ NUM_DATA = len(TIMES)
 CP_NBINS = 1*int(TIMES_MAX - TIMES_MIN) #one per year
 CP_hist_save = np.zeros( (len(run_components),CP_NBINS), dtype=int )
 
-ntheta = 16
-nphi = 8 
+ntheta = 33
+nphi = 72
 
-radius = 6371.
+radius = 6371.2
 phis = np.linspace(-180, 180 , nphi, endpoint=False, dtype=float)
 thetas = np.linspace(-80,80, ntheta, endpoint=True, dtype=float) + 90.
 theta_grid, phi_grid = np.meshgrid(thetas, phis)
@@ -108,7 +108,7 @@ def my_calc_par(thetaphi_g):
         build_marginal_intensity = True
         RUNNING_MODE = 1
         burn_in = 10000
-        NSAMPLE = 2000000 + burn_in
+        NSAMPLE = 20000000 + burn_in
         Acceptance_rates=np.zeros(4)
         AV = np.zeros(discretise_size,dtype=float)
         SUP = np.zeros(discretise_size,dtype=float)
@@ -146,5 +146,5 @@ if __name__ == '__main__':
             results.append( loc_results )
 
 import pickle
-with open("Jerk9.results", "wb") as fp:   #Pickling
+with open("Jerk6_5x5_20M.results", "wb") as fp:   #Pickling
     pickle.dump(results, fp)
