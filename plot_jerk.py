@@ -12,6 +12,7 @@ jerk_times = [4600,5750,2920, 1915, 6490,7300,7620,7840,8880,9673,10590,12620,13
 # sample every year
 time_yearly = np.arange(jerk_times[jerk_number]-200,jerk_times[jerk_number]+200+1)
 t0 = jerk_times[jerk_number]
+f_size = 16  # fontsize for figure
 
 filename = "Jerk"+str(jerk_number+1)+"_5x5_20M.results"
 with open(filename, "rb") as fp:   # Unpickling
@@ -56,30 +57,31 @@ cmap = plt.get_cmap('rainbow', max_count-0+1)
 print( 'Max jerk count is ' + str(max_count))   
 plt.figure()
 axes = [0,0,0]
-f, (axes[0],axes[1],axes[2]) = plt.subplots(nrows=3, ncols=1, figsize=(7,12),sharex=True, subplot_kw={'projection': ccrs.PlateCarree() }) 
+f, (axes[0],axes[1],axes[2]) = plt.subplots(nrows=3, ncols=1, figsize=(5,10),sharex=True, subplot_kw={'projection': ccrs.PlateCarree() }) 
 
-marker_size = 10. 
+marker_size = 7. 
 
 for i in range(3):
     if i == 0:
         cax = axes[i].scatter(x_phi,90.-np.array(x_theta), s = marker_size, c=x_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
-        axes[i].set_title(r'$dB_X/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(x_count),np.sum(np.array(x_count)>0)))
+        axes[i].set_title(r'$dB_X/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(x_count),np.sum(np.array(x_count)>0)),fontsize=f_size)
         gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=True, 
                       linewidth=2, color='gray', alpha=0.5, linestyle='--')
         gl.xlabels_top = False
     elif i == 1:
         cax = axes[i].scatter(y_phi,90.-np.array(y_theta), s = marker_size, c=y_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
-        axes[i].set_title(r'$dB_Y/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(y_count),np.sum(np.array(y_count)>0)))
+        axes[i].set_title(r'$dB_Y/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(y_count),np.sum(np.array(y_count)>0)),fontsize=f_size)
         gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=True, 
                       linewidth=2, color='gray', alpha=0.5, linestyle='--')
         gl.xlabels_top = False
     elif i == 2:
         cax = axes[i].scatter(z_phi,90.-np.array(z_theta), s = marker_size, c=z_count,cmap=cmap, vmin=0-0.5, vmax=(max_count)+0.5)
-        axes[i].set_title(r'$dB_Z/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(z_count),np.sum(np.array(z_count)>0)))
+        axes[i].set_title(r'$dB_Z/dt, \qquad \Sigma_{{total}} = {0:d},\; \Sigma_{{nz}} = {1:d}$'.format(sum(z_count),np.sum(np.array(z_count)>0)),fontsize=f_size)
         gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=True, 
                       linewidth=2, color='gray', alpha=0.5, linestyle='--')
         gl.xlabels_top = False
-        
+        #gl.xlabel_style = {'size': f_size}
+        #gl.ylabel_style = {'size': f_size}
     axes[i].coastlines()
     #gl = axes[i].gridlines(crs=ccrs.PlateCarree(), draw_labels=[1,0,0,1],
     #                  linewidth=2, color='gray', alpha=0.5, linestyle='--')
@@ -96,7 +98,7 @@ cbar = f.colorbar(cax, ax=cb_ax, orientation = 'horizontal')
 cb_ax.set_axis_off()
 
 cbar.set_ticks(range(0,max_count+1))
-outfname = 'Jerk'+str(jerk_number+1)+'_' + str(int(10*height_threshold)) + '_' + str(distance_threshold)
+outfname = 'Jerk'+str(jerk_number+1)+'_' + str(int(10*height_threshold)) + '_' + str(distance_threshold)+'_5x5_20M'
 f.savefig(outfname + '.pdf',bbox_inches = 'tight')
 f.savefig(outfname + '.png',bbox_inches = 'tight')
 plt.close()
@@ -131,9 +133,9 @@ for j in range(len(results)):
     phi = results[j][1]
     component = results[j][2]
     CP = results[j][3]
-    if(theta==90 and phi == 80):
-        theta=90
-        phi=80
+    if(theta==45 and phi == -25):
+        #theta=90
+        #phi=80
         Br, Btheta, Bphi = cp.model_utils.synth_values(coeffs, radius, theta, phi,nmax=13)
         Br_yearly,Btheta_yearly, Bphi_yearly = np.interp(time_yearly, time, Br ), np.interp(time_yearly, time, Btheta ), np.interp(time_yearly, time, Bphi )
         Bx_dot, By_dot, Bz_dot = -np.gradient(Btheta_yearly,time_yearly), np.gradient(Bphi_yearly,time_yearly), -np.gradient(Br_yearly,time_yearly)
@@ -161,12 +163,12 @@ for j in range(len(results)):
 
         time_EJ, EJ = np.loadtxt('Jerk_energy.dat',unpack=True)
         ax4.plot(time_EJ, EJ )
-        ax4.set_xlim(8860, 8900 )
+        ax4.set_xlim(time_yearly.min(), time_yearly.max()  )
         ax4.set_title('Jerk energy')
 
 
         plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.5)
 
-outfname = 'Jerk'+str(jerk_number+1)+'_ts_theta90_phi80'
-plt.savefig(outfname+'.pdf')
-plt.savefig(outfname+'.png')
+        outfname = 'Jerk'+str(jerk_number+1)+'_ts_theta'+str(theta)+'_phi'+str(phi)
+        plt.savefig(outfname+'.pdf')
+        plt.savefig(outfname+'.png')
