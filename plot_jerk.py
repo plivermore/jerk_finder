@@ -124,7 +124,7 @@ TIMES_MAX = TIMES.max()
 CP_NBINS = 1*np.int(TIMES_MAX - TIMES_MIN) #one per year
 
 plt.figure()
-f, (ax1, ax2,ax3,ax4) = plt.subplots(4, 1, figsize=(13,9) )
+f, (ax1, ax2,ax3,ax4) = plt.subplots(4, 1, figsize=(13,9), sharex=True)
 
 for j in range(len(results)):
     theta = results[j][0]
@@ -161,7 +161,7 @@ for j in range(len(results)):
 
         time_EJ, EJ = np.loadtxt('Jerk_energy.dat',unpack=True)
         ax4.plot(time_EJ, EJ )
-        ax4.set_xlim(8860, 8900 )
+        #ax4.set_xlim(8860, 8900 )
         ax4.set_title('Jerk energy')
 
 
