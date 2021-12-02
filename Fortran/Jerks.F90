@@ -30,7 +30,9 @@ MODULE Jerks
 !
 ! discretise_size: the number of grid points that defines the resolution of some of the outputs (e.g. ensemble mean, median timeseries).
 !
-! cp_bins: the number of bins defining the histogram of internal vertices
+! cp_nbins: the number of bins defining the histogram of internal vertices (change points)
+
+! cp_edges: the edges of the bins defining the histogram of internal vertices (change points). Note that the size of cp_edges should be cp_bins + 1
 !
 ! thin: the amount of chain thinning. E.g. a value of n means that statistics are only evaluated only at every nth model
 !
@@ -70,7 +72,7 @@ USE SUBS
 CONTAINS
 SUBROUTINE RJMCMC(sigmas, burn_in, NSAMPLE, NUM_DATA, TIMES, &
            Y, delta_Y, Y_MIN, Y_MAX, TIMES_MIN, &
-           TIMES_MAX, K_MIN, K_MAX, discretise_size, CP_NBINS, &
+           TIMES_MAX, K_MIN, K_MAX, discretise_size, CP_NBINS, CP_EDGES, &
            THIN, NBINS, credible, RUNNING_MODE, &
            Acceptance_rates, CREDIBLE_SUP, CREDIBLE_INF, ENSEMBLE_AV, ENSEMBLE_MEDIAN, &
            ENSEMBLE_MODE, CHANGE_POINTS, MARGINAL_DENSITY, &
@@ -89,6 +91,7 @@ integer, intent(in)   :: thin, NBINS, K_MIN, K_MAX, discretise_size
 integer, intent(in) :: NSAMPLE
 real(dp), intent(in) :: sigmas(3)
 INTEGER, intent(in) :: CP_NBINS
+real(dp), intent(in) :: CP_EDGES(CP_NBINS + 1)
 
 ! OUTPUTS
 real(dp), intent(out) :: Acceptance_rates(4)
@@ -111,8 +114,10 @@ REAL(dp), ALLOCATABLE :: interpolated_signal(:), TIME(:), PTS_NEW(:,:)
 INTEGER, ALLOCATABLE, DIMENSION(:) :: IND_MIN, IND_MAX, ORDER
 INTEGER, ALLOCATABLE :: discrete_history(:,:)
 LOGICAL :: CALC_CREDIBLE
-INTEGER :: input_random_seed, BIN_INDEX_PREVIOUS
+INTEGER :: input_random_seed
 INTEGER, ALLOCATABLE :: SEED(:)
+INTEGER :: BIN_UPDATES(CP_NBINS)
+
 
 IF( credible > 0.0_dp) THEN
 CALC_CREDIBLE = .TRUE.
@@ -537,26 +542,22 @@ N_changepoint_hist(k)=N_changepoint_hist(k) + 1
 
 
 !calculate the histogram on change points, adding a 1 to the bin if there is a change point.
-
 !Only allow at most one changepoint in any bin - this is so the bin count normalised by the number of models is the probability of a changepoint.  
 
-BIN_INDEX_PREVIOUS = -1
-DO i=1,k
-BIN_INDEX = FLOOR( (pt(i,1)-TIMES_MIN)/REAL(TIMES_MAX-TIMES_MIN, KIND = dp) * CP_NBINS ) + 1
-IF( BIN_INDEX < 0 .OR. BIN_INDEX > CP_NBINS) THEN
-PRINT*, 'FATAL ERROR, BIN_INDEX IS OUT OF RANGE'
-PRINT*, ' MODEL POINT ', I, ' VALUE ',pt(i,1)
-PRINT*, 'TIMES MIN/MAX ', TIMES_MIN, TIMES_MAX
-STOP
-ENDIF
-! If it's the first bin to consider then add a 1 to the bin; also add a 1 to the bin if the bin is different to that already considered. Update the previous bin index when done.
+! zero the update vector
+BIN_UPDATES(1:CP_NBINS) = 0
 
-IF( BIN_INDEX_PREVIOUS == -1 .OR. BIN_INDEX_PREVIOUS .NE. BIN_INDEX) THEN
-CHANGE_POINTS(BIN_INDEX) = CHANGE_POINTS(BIN_INDEX) + 1
-BIN_INDEX_PREVIOUS = BIN_INDEX
-ENDIF
+DO i=1, k !loop over all change points
+DO j = 1, CP_NBINS
+    IF( pt(i,1) >= CP_EDGES(j) .AND. pt(i,1) < CP_EDGES(j+1) ) THEN
+        BIN_UPDATES(j) = 1
+        EXIT
+    ENDIF
+ENDDO
+ENDDO
 
-enddo
+CHANGE_POINTS(1:CP_NBINS) = CHANGE_POINTS(1:CP_NBINS) + BIN_UPDATES(1:CP_NBINS)
+
 
 
 ENDIF !collect stats
