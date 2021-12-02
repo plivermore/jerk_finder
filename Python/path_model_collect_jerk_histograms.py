@@ -59,7 +59,9 @@ TIMES_MIN = TIMES.min()
 TIMES_MAX = TIMES.max()
 NUM_DATA = len(TIMES)
 
-CP_NBINS = 1*int(TIMES_MAX - TIMES_MIN) #one per year
+CP_EDGES = np.arange(-225,226,50) + jerk_times[jerk_number]
+CP_NBINS = CP_EDGES.shape[0]-1
+
 CP_hist_save = np.zeros( (len(run_components),CP_NBINS), dtype=int )
 
 ntheta = 33
@@ -123,7 +125,7 @@ def my_calc_par(thetaphi_g):
          sigmas=sigmas, burn_in=burn_in, 
          nsample=NSAMPLE, num_data=NUM_DATA, times=TIMES, y=SV, delta_y=delta_SV, 
          y_min=SV_MIN, y_max=SV_MAX, times_min=TIMES_MIN, times_max=TIMES_MAX, k_min=K_MIN, 
-         k_max=K_MAX, discretise_size=discretise_size, cp_nbins = CP_NBINS,
+         k_max=K_MAX, discretise_size=discretise_size, cp_nbins = CP_NBINS, cp_edges = CP_EDGES,
          thin=THIN, nbins=NBINS, credible=credible, running_mode=RUNNING_MODE)
 
         # save the model
@@ -146,5 +148,5 @@ if __name__ == '__main__':
             results.append( loc_results )
 
 import pickle
-with open("Jerk6_5x5_20M.results", "wb") as fp:   #Pickling
+with open("Jerk{0:1d}_5x5_20M.results".format(jerk_number+1), "wb") as fp:   #Pickling
     pickle.dump(results, fp)
