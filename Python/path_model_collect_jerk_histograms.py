@@ -8,13 +8,14 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
+sys.path.append( os.path.abspath('..') )
 from jerks import jerks
 import chaosmagpy as cp
 
 # %%
 # Download the spherical harmonic time-series output from the path model
 import os.path
-if not os.path.exists('Gauss_Bsurf.mat'): 
+if not os.path.exists('Gauss_Bsurf.mat'):
     os.system('wget --no-verbose http://morpho.ipgp.fr/4DEarth/Gauss_Bsurf.mat')
 
 # %%
@@ -59,10 +60,17 @@ TIMES_MIN = TIMES.min()
 TIMES_MAX = TIMES.max()
 NUM_DATA = len(TIMES)
 
-CP_EDGES = np.arange(-225,226,50) + jerk_times[jerk_number]
-CP_NBINS = CP_EDGES.shape[0]-1
+# ****************************************
+# Define diagnostic time bins here
+# ****************************************
+time_intervals_edges = np.arange(-210,211,20) + jerk_times[jerk_number]
+time_intervals_nbins = time_intervals_edges.shape[0]-1
 
-CP_hist_save = np.zeros( (len(run_components),CP_NBINS), dtype=int )
+
+# ****************************************
+
+
+CP_hist_save = np.zeros( (len(run_components),time_intervals_nbins), dtype=int )
 
 ntheta = 33
 nphi = 72
@@ -117,20 +125,22 @@ def my_calc_par(thetaphi_g):
         INF = np.zeros(discretise_size,dtype=float)
         MEDIAN = np.zeros(discretise_size,dtype=float)
         MODE = np.zeros(discretise_size,dtype=float)
-        CP_hist_run = np.zeros( CP_NBINS, dtype=int )
+        CP_hist_run = np.zeros( time_intervals_nbins, dtype=int )
         MARGINAL_DENSITY = np.zeros( (discretise_size,NBINS),dtype=float )
         N_CP_hist = np.zeros( K_MAX, dtype=int)
+        delta_slope = np.zeros( time_intervals_nbins,dtype=int )
 
-        (Acceptance_rates,SUP, INF, AV, MEDIAN, MODE, CP_hist_run, MARGINAL_DENSITY, N_CP_hist) = jerks.rjmcmc(
+        
+        (Acceptance_rates,SUP, INF, AV, MEDIAN, MODE, CP_hist_run, delta_slope, MARGINAL_DENSITY, N_CP_hist) = jerks.rjmcmc(
          sigmas=sigmas, burn_in=burn_in, 
          nsample=NSAMPLE, num_data=NUM_DATA, times=TIMES, y=SV, delta_y=delta_SV, 
          y_min=SV_MIN, y_max=SV_MAX, times_min=TIMES_MIN, times_max=TIMES_MAX, k_min=K_MIN, 
-         k_max=K_MAX, discretise_size=discretise_size, cp_nbins = CP_NBINS, cp_edges = CP_EDGES,
+         k_max=K_MAX, discretise_size=discretise_size, time_intervals_nbins = time_intervals_nbins,time_intervals_edges = time_intervals_edges,
          thin=THIN, nbins=NBINS, credible=credible, running_mode=RUNNING_MODE)
 
         # save the model
         fac = (NSAMPLE-burn_in)/THIN
-        loc_results.append([theta_l, phi_l,i,CP_hist_run[:]/fac])
+        loc_results.append([theta_l, phi_l,i,CP_hist_run[:]/fac,delta_slope])
     return loc_results
 
 
@@ -148,5 +158,5 @@ if __name__ == '__main__':
             results.append( loc_results )
 
 import pickle
-with open("Jerk{0:1d}_5x5_20M.results".format(jerk_number+1), "wb") as fp:   #Pickling
+with open("Jerk{0:1d}_5x5_20M_20yr.results".format(jerk_number+1), "wb") as fp:   #Pickling
     pickle.dump(results, fp)
