@@ -72,8 +72,8 @@ time_intervals_nbins = time_intervals_edges.shape[0]-1
 
 CP_hist_save = np.zeros( (len(run_components),time_intervals_nbins), dtype=int )
 
-ntheta = 33
-nphi = 72
+ntheta = 1 
+nphi =1 
 
 radius = 6371.2
 phis = np.linspace(-180, 180 , nphi, endpoint=False, dtype=float)
@@ -156,7 +156,8 @@ if __name__ == '__main__':
         results = []
         for ipt in range(npt):
             loc_results = my_calc_par( thetaphi_g[ipt])
-            results += [loc_results]
+            results += loc_results
+
 
 import pickle
 with open("Jerk{0:1d}_5x5_20M_20yr.results".format(jerk_number+1), "wb") as fp:   #Pickling
