@@ -38,6 +38,8 @@
 jerks.cpython-38-darwin.so.dSYM/*
 jerks.cpython-37m-darwin.so.dSYM/*
 Gauss_Bsurf.mat
+laptop_compiled/
+desktop_compiled/
 
 *.pdf
 *.png

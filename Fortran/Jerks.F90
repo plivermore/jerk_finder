@@ -188,7 +188,11 @@ delta_slope(:) = 0.0_dp
 
 ! initial condition
 CALL RANDOM_NUMBER( RAND(1))
-k_init = floor(RAND(1) * (K_max - K_min+1)) + k_min
+!k_init = floor(RAND(1) * (K_max - K_min+1)) + k_min
+
+! Fix k_init = 1 to speed up convergence.
+
+k_init = 1
 k = k_init
 
 DO i=1,k_init
@@ -201,7 +205,6 @@ enddo
 CALL RANDOM_NUMBER (RAND(1:2))
 endpt(1) = Y_min+RAND(1) * (Y_MAX-Y_MIN)
 endpt(2) = Y_min+RAND(2) * (Y_MAX-Y_MIN)
-
 
 ! make sure the positions are sorted in ascending order.
 

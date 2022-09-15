@@ -1,0 +1,1 @@
+ffmpeg  -framerate 5 -pattern_type glob -i 'Jerk_delta_map_3_5x5_100M_timeindex*.png'  -c:v libx264 -vf "fps=25,format=yuv420p,scale=1280:-2"   event3.mp4
