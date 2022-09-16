@@ -70,9 +70,9 @@ Note that the size of time_intervals_edges should be time_intervals_nbins + 1
 
 **ENSEMBLE_MODE**: the ensemble modal model (array size: discretize_size)
 
-**CHANGE_POINTS**: a histogram of the timing of internal vertices (array, size time_intervals_nbins). Each model can add at most 1 to each bin; so normalised over all models this is a posterior probability.
+**CHANGE_POINTS**: a histogram of the timing of internal vertices (array size: time_intervals_nbins). Each model can add at most 1 to each bin; so normalised over all models this is a posterior probability.
 
-**MARGINAL_DENSITY**: a 2D marginal density for the linear ensemble or zeros (if not calculated); (array, size: discretise_size,NBINS)
+**MARGINAL_DENSITY**: a 2D marginal density for the linear ensemble or zeros (if not calculated); (array size: discretise_size,NBINS)
 
 **N_changepoint_hist**: a histogram of the number of internal vertices (1D array, dimensions K_MIN:K_MAX)
 
