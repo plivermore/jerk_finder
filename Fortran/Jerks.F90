@@ -125,7 +125,7 @@ INTEGER, ALLOCATABLE :: SEED(:)
 INTEGER :: BIN_COUNT(time_intervals_nbins)
 REAL(dp) :: fn(1), fn_plus_1(1), fn_minus_1(1), X(1)
 
-REAL(dp), PARAMETER :: delta_time_slope = 1.0e-6   !perturbation used to measure slopes
+REAL(dp), PARAMETER :: delta_time_slope = 1.0e-6_dp   !perturbation used to measure slopes
 
 
 IF( credible > 0.0_dp) THEN
@@ -575,6 +575,7 @@ DO j = 1, time_intervals_nbins
     CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn_minus_1) !the function at a point x_{n-1}
 
 ! Change in slope is approximated by abs(  f(x_{n+1}) - f(x_{n})/delta_time_slope  - ( f(x_n) - f(x_{n-1}) ) /delta_time_slope )
+
 
         delta_slope(j) = delta_slope(j) + abs( (fn_plus_1(1) + fn_minus_1(1) - 2.0_dp * fn(1))/delta_time_slope )
 
