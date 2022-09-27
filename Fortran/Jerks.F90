@@ -33,13 +33,14 @@ MODULE Jerks
 ! time_intervals_nbins: the number of bins used to define diagnostics such as the histogram of internal vertices (change points), or the normalised change in slope
 
 ! time_intervals_edges: the edges of the bins used to define diagnostics such as the histogram of internal vertices (change points), or the normalised change in slope.
+
 ! Note that the size of time_intervals_edges should be time_intervals_nbins + 1
 !
 ! thin: the amount of chain thinning. E.g. a value of n means that statistics are only evaluated only at every nth model
 !
 ! nbins: the number of bins defining the model density histogram
 !
-! credible: credible interval bounds as percentage e.g. 95. A value of 0 means that credible intervals are not calculated.
+! credible (integer): credible interval bounds for the model as percentage e.g. 95. A value of 0 means that credible intervals are not calculated.
 !
 ! RUNNING_MODE: 1 indicates that the posterior is returned; otherwise the prior distribution is returned.
 !
@@ -49,9 +50,9 @@ MODULE Jerks
 !
 ! Acceptance_rates:  acceptance rates for change value, move (in time), birth, death
 !
-! CREDIBLE_SUP: the upper bound for the credible interval (array size: discretize_size), or an array of zeros if credible interval is not calculated.
+! CREDIBLE_SUP: the upper bound for the credible interval for the model (array size: discretize_size), or an array of zeros if credible interval is not calculated.
 !
-! CREDIBLE_INF: the lower bound for the credible interval (array size: discretize_size), or an array of zeros if credible interval is not calculated.
+! CREDIBLE_INF: the lower bound for the credible interval for the model (array size: discretize_size), or an array of zeros if credible interval is not calculated.
 !
 ! ENSEMBLE_AV: the ensemble average model (array size: discretize_size)
 !
@@ -66,9 +67,14 @@ MODULE Jerks
 !
 ! N_changepoint_hist: a histogram of the number of internal vertices (1D array, dimensions K_MIN:K_MAX)
 !
-! delta_slope : the sum of the absolute values of any change in slope over all models occuring during a given time bin; normalised by the number of models.
-! That is, \sum_i  abs(delta slope), where i is over all models and over a certain temporal bin defined in the input vector time_intervals_edges.
+! av_delta_slope : the mean of the absolute values of any change in slope over all models occuring during a given time bin; normalised by the number of models. That is,  1/N * \sum_i  abs(delta slope), where i is over all models and over a certain temporal bin defined in the input vector time_intervals_edges.
 ! (1D array, size: time_intervals_nbins)
+
+! median_delta_slope: the median of the absolute change in slope over all models occuring during a given time bin; normalised by the number of models. That is,  median [ \sum_{within time bin} abs(delta slope) ]. For each model kept (after thinning), the sum of absolute gradient changes is determined for each time bin. The median value over all models is then computed and returned. 
+! (1D array, size: time_intervals_nbins)
+
+! lower, upper_credible_delta_slope: the lower,upper credible interval bounds (e.g. 95%) for delta_slope, binned. Only calculated if argument credible > 0, otherwise zeros.   (1D array, size: time_intervals_nbins)
+
 
 USE SORT
 USE SUBS
@@ -79,7 +85,8 @@ SUBROUTINE RJMCMC(sigmas, burn_in, NSAMPLE, NUM_DATA, TIMES, &
            TIMES_MAX, K_MIN, K_MAX, discretise_size, time_intervals_nbins, time_intervals_edges, &
            THIN, NBINS, credible, RUNNING_MODE, &
            Acceptance_rates, CREDIBLE_SUP, CREDIBLE_INF, ENSEMBLE_AV, ENSEMBLE_MEDIAN, &
-           ENSEMBLE_MODE, CHANGE_POINTS, delta_slope,  MARGINAL_DENSITY, &
+           ENSEMBLE_MODE, CHANGE_POINTS, av_delta_slope, median_delta_slope, & 
+           upper_credible_delta_slope, lower_credible_delta_slope, MARGINAL_DENSITY, &
            N_changepoint_hist )
 
 
@@ -90,7 +97,8 @@ INTEGER, PARAMETER :: dp = 8!
 integer, intent(in)   :: BURN_IN, RUNNING_MODE
 integer, intent(in)   :: NUM_DATA
 real(dp), intent(in)  :: TIMES(NUM_DATA), Y(NUM_DATA), delta_Y(NUM_DATA)
-real(dp), intent(in) :: Y_MIN, Y_MAX, TIMES_MIN, TIMES_MAX, credible
+real(dp), intent(in) :: Y_MIN, Y_MAX, TIMES_MIN, TIMES_MAX
+integer, intent(in) :: credible
 integer, intent(in)   :: thin, NBINS, K_MIN, K_MAX, discretise_size
 integer, intent(in) :: NSAMPLE
 real(dp), intent(in) :: sigmas(3)
@@ -107,7 +115,10 @@ INTEGER, intent(out) :: CHANGE_POINTS(time_intervals_nbins)
 REAL( KIND = dp), intent(out) :: MARGINAL_DENSITY(discretise_size,NBINS)
 INTEGER, intent(out) :: N_changepoint_hist(K_MIN:K_MAX)
 
-REAL( KIND = dp), intent(out) :: delta_slope(time_intervals_nbins)
+REAL( KIND = dp), intent(out) :: av_delta_slope(time_intervals_nbins), median_delta_slope(time_intervals_nbins)
+REAL( KIND = dp), intent(out) :: upper_credible_delta_slope(time_intervals_nbins)
+REAL( KIND = dp), intent(out) :: lower_credible_delta_slope(time_intervals_nbins)
+
 
 ! Internal variables
 
@@ -127,13 +138,21 @@ REAL(dp) :: fn(1), fn_plus_1(1), fn_minus_1(1), X(1)
 
 REAL(dp), PARAMETER :: delta_time_slope = 1.0e-6_dp   !perturbation used to measure slopes
 
+INTEGER :: Num_sampled_models 
+REAL(dp), DIMENSION( (NSAMPLE -BURN_IN)/THIN, time_intervals_nbins) :: discretise_delta_slope
+REAL(dp) :: delta_slope_current(time_intervals_nbins)
 
-IF( credible > 0.0_dp) THEN
+Num_sampled_models = (NSAMPLE -BURN_IN)/THIN
+
+IF( credible > 0) THEN
 CALC_CREDIBLE = .TRUE.
 ELSE
 CALC_CREDIBLE = .FALSE.
 CREDIBLE_SUP(:) = 0.0_dp
 CREDIBLE_INF(:) = 0.0_dp
+upper_credible_delta_slope(:) = 0.0_dp
+lower_credible_delta_slope(:) = 0.0_dp
+
 ENDIF
 
 input_random_seed = 1
@@ -149,7 +168,7 @@ sigma_birth = sigmas(3)
 ! Other parameters are fixed here
 k_max_array_bound = k_max + 1;
 
-NUM = ceiling((nsample-burn_in)*(100.0_8-credible)/200.0_8/thin) ! number of collected samples for credible intervals
+NUM = ceiling((nsample-burn_in)*(100-credible)/200.0_8/thin) ! number of collected samples for credible intervals
 
 ALLOCATE( TIME(discretise_size) )
 DO I=1, discretise_size
@@ -184,7 +203,8 @@ PA = 0
 P_sd = 0
 A_sd = 0
 AA = 0
-delta_slope(:) = 0.0_dp
+av_delta_slope(:) = 0.0_dp
+median_delta_slope(:) = 0.0_dp
 
 ! initial condition
 CALL RANDOM_NUMBER( RAND(1))
@@ -561,6 +581,9 @@ N_changepoint_hist(k)=N_changepoint_hist(k) + 1
 ! zero the update vector
 BIN_COUNT(1:time_intervals_nbins) = 0
 
+! This is the vector of delta_slope values for the current model
+delta_slope_current(:) = 0.0_dp
+
 DO i=1, k !loop over all change points
 DO j = 1, time_intervals_nbins
     IF( pt(i,1) >= time_intervals_edges(j) .AND. pt(i,1) < time_intervals_edges(j+1) ) THEN  ! relevant bin found
@@ -577,13 +600,19 @@ DO j = 1, time_intervals_nbins
 ! Change in slope is approximated by abs(  f(x_{n+1}) - f(x_{n})/delta_time_slope  - ( f(x_n) - f(x_{n-1}) ) /delta_time_slope )
 
 
-        delta_slope(j) = delta_slope(j) + abs( (fn_plus_1(1) + fn_minus_1(1) - 2.0_dp * fn(1))/delta_time_slope )
+        delta_slope_current(j) = delta_slope_current(j) + abs( (fn_plus_1(1) + fn_minus_1(1) - 2.0_dp * fn(1))/delta_time_slope )
 
 
         EXIT  ! now try another change point
     ENDIF
 ENDDO
 ENDDO
+
+! Add in delta_slope information:
+av_delta_slope(:) = av_delta_slope(:) + delta_slope_current(:)
+
+! Save slope information 
+discretise_delta_slope(b,:) = delta_slope_current(:)
 
 ! Add in the update to the bin counts
 CHANGE_POINTS(1:time_intervals_nbins) = CHANGE_POINTS(1:time_intervals_nbins) + BIN_COUNT(1:time_intervals_nbins)
@@ -596,7 +625,7 @@ enddo ! the Sampling of the mcmc
 ! Compute the average
 ENSEMBLE_AV(:)=ENSEMBLE_AV(:)/b
 
-delta_slope(:) = delta_slope(:) / b
+av_delta_slope(:) = av_delta_slope(:) / b
 
 do i=1, discretise_size
 
@@ -621,6 +650,32 @@ enddo
 
 ! normalise marginal distributions
 MARGINAL_DENSITY(:,:) = REAL(discrete_history(:,:), KIND = dp)/ sum( discrete_history(1,:) )
+
+
+! Calculate median for delta_slope
+! For each bin, sort the data and find the median value
+
+ALLOCATE( order (Num_sampled_models)  )
+
+Do j = 1, time_intervals_nbins
+
+! Find the order that sorts the data
+order = rargsort(discretise_delta_slope(:,j) )
+
+median_delta_slope(j) = discretise_delta_slope(order( int(Num_sampled_models/2)),j) !median is 50% of the way along the ordered dataset.
+
+IF( CALC_CREDIBLE ) THEN
+lower_credible_delta_slope(j) = &
+            discretise_delta_slope(order( int(Num_sampled_models * (100.0_dp - credible)/200.0_dp)),j) !lower credible
+upper_credible_delta_slope(j) = &
+            discretise_delta_slope(order( int(Num_sampled_models * (100.0_dp + credible)/200.0_dp)),j) !upper credible 
+
+! Recall that 95% credible interval means that the tails are at 97.5% and 2.5%, i.e. (100-95)/200  and  0.95 + (100-95)/200 or (100 + 95)/200
+ENDIF
+
+
+ENDDO
+DEALLOCATE (order)
 
 
 
