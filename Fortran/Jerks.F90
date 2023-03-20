@@ -30,12 +30,6 @@ MODULE Jerks
 !
 ! discretise_size: the number of grid points that defines the resolution of some of the outputs (e.g. ensemble mean, median timeseries).
 !
-! time_intervals_nbins: the number of bins used to define diagnostics such as the histogram of internal vertices (change points), or the normalised change in slope
-
-! time_intervals_edges: the edges of the bins used to define diagnostics such as the histogram of internal vertices (change points), or the normalised change in slope.
-
-! Note that the size of time_intervals_edges should be time_intervals_nbins + 1
-!
 ! thin: the amount of chain thinning. E.g. a value of n means that statistics are only evaluated only at every nth model
 !
 ! nbins: the number of bins defining the model density histogram
@@ -60,20 +54,19 @@ MODULE Jerks
 !
 ! ENSEMBLE_MODE: the ensemble modal model (array size: discretize_size)
 !
-! CHANGE_POINTS: a histogram of the timing of internal vertices (array, size time_intervals_nbins)
-! Each model can add at most 1 to each bin; so normalised over all models this is a posterior probability.
-!
 ! MARGINAL_DENSITY: a 2D marginal density for the linear ensemble or zeros (if not calculated); (array, size: discretise_size,NBINS)
 !
 ! N_changepoint_hist: a histogram of the number of internal vertices (1D array, dimensions K_MIN:K_MAX)
-!
-! av_delta_slope : the mean of the absolute values of any change in slope over all models occuring during a given time bin; normalised by the number of models. That is,  1/N * \sum_i  abs(delta slope), where i is over all models and over a certain temporal bin defined in the input vector time_intervals_edges.
-! (1D array, size: time_intervals_nbins)
 
-! median_delta_slope: the median of the absolute change in slope over all models occuring during a given time bin; normalised by the number of models. That is,  median [ \sum_{within time bin} abs(delta slope) ]. For each model kept (after thinning), the sum of absolute gradient changes is determined for each time bin. The median value over all models is then computed and returned. 
-! (1D array, size: time_intervals_nbins)
+! jerk_data: 2D array of change in slope and the time of each changepoint, from the thinned Markov chain.
+! (2D array, dimensions: max_size_jerk_data, 2). To make it easier to pass this information back to the Python calling routine,
+! this array is of pre-defined shape.
 
-! lower, upper_credible_delta_slope: the lower,upper credible interval bounds (e.g. 95%) for delta_slope, binned. Only calculated if argument credible > 0, otherwise zeros.   (1D array, size: time_intervals_nbins)
+! jerk_data(:,1) are the times; jerk_data(:,2) are the changes in slope.
+! The parameter max_size_jerk_data = K_MAX*(NSAMPLE -BURN_IN)/THIN, which is the maximum possible size.
+! jerk_data is padded with zeros for all the elements unused.
+
+! size_jerk_data: an integer giving the number of changepoints stored in jerk_data.
 
 
 USE SORT
@@ -82,12 +75,11 @@ USE SUBS
 CONTAINS
 SUBROUTINE RJMCMC(sigmas, burn_in, NSAMPLE, NUM_DATA, TIMES, &
            Y, delta_Y, Y_MIN, Y_MAX, TIMES_MIN, &
-           TIMES_MAX, K_MIN, K_MAX, discretise_size, time_intervals_nbins, time_intervals_edges, &
+           TIMES_MAX, K_MIN, K_MAX, discretise_size, &
            THIN, NBINS, credible, RUNNING_MODE, &
            Acceptance_rates, CREDIBLE_SUP, CREDIBLE_INF, ENSEMBLE_AV, ENSEMBLE_MEDIAN, &
-           ENSEMBLE_MODE, CHANGE_POINTS, av_delta_slope, median_delta_slope, & 
-           upper_credible_delta_slope, lower_credible_delta_slope, MARGINAL_DENSITY, &
-           N_changepoint_hist )
+           ENSEMBLE_MODE, MARGINAL_DENSITY, &
+           N_changepoint_hist, jerk_data, size_jerk_data )
 
 
 IMPLICIT NONE
@@ -102,23 +94,19 @@ integer, intent(in) :: credible
 integer, intent(in)   :: thin, NBINS, K_MIN, K_MAX, discretise_size
 integer, intent(in) :: NSAMPLE
 real(dp), intent(in) :: sigmas(3)
-INTEGER, intent(in) :: time_intervals_nbins
-real(dp), intent(in) :: time_intervals_edges(time_intervals_nbins + 1)
+
 
 
 ! OUTPUTS
 real(dp), intent(out) :: Acceptance_rates(4)
 REAL( KIND = dp), DIMENSION(1:discretise_size), intent(out) :: ENSEMBLE_AV, CREDIBLE_SUP, &
         CREDIBLE_INF, ENSEMBLE_MEDIAN, ENSEMBLE_MODE
-INTEGER, intent(out) :: CHANGE_POINTS(time_intervals_nbins)
 
 REAL( KIND = dp), intent(out) :: MARGINAL_DENSITY(discretise_size,NBINS)
 INTEGER, intent(out) :: N_changepoint_hist(K_MIN:K_MAX)
 
-REAL( KIND = dp), intent(out) :: av_delta_slope(time_intervals_nbins), median_delta_slope(time_intervals_nbins)
-REAL( KIND = dp), intent(out) :: upper_credible_delta_slope(time_intervals_nbins)
-REAL( KIND = dp), intent(out) :: lower_credible_delta_slope(time_intervals_nbins)
-
+INTEGER, intent(out) :: size_jerk_data
+REAL( KIND = dp), intent(out) :: jerk_data( K_MAX * (NSAMPLE - BURN_IN)/THIN, 2)
 
 ! Internal variables
 
@@ -133,16 +121,12 @@ INTEGER, ALLOCATABLE :: discrete_history(:,:)
 LOGICAL :: CALC_CREDIBLE
 INTEGER :: input_random_seed
 INTEGER, ALLOCATABLE :: SEED(:)
-INTEGER :: BIN_COUNT(time_intervals_nbins)
 REAL(dp) :: fn(1), fn_plus_1(1), fn_minus_1(1), X(1)
 
 REAL(dp), PARAMETER :: delta_time_slope = 1.0e-6_dp   !perturbation used to measure slopes
 
-INTEGER :: Num_sampled_models 
-REAL(dp), DIMENSION( (NSAMPLE -BURN_IN)/THIN, time_intervals_nbins) :: discretise_delta_slope
-REAL(dp) :: delta_slope_current(time_intervals_nbins)
-
-Num_sampled_models = (NSAMPLE -BURN_IN)/THIN
+jerk_data(:,:) = 0.0_dp
+size_jerk_data = 0
 
 IF( credible > 0) THEN
 CALC_CREDIBLE = .TRUE.
@@ -150,8 +134,7 @@ ELSE
 CALC_CREDIBLE = .FALSE.
 CREDIBLE_SUP(:) = 0.0_dp
 CREDIBLE_INF(:) = 0.0_dp
-upper_credible_delta_slope(:) = 0.0_dp
-lower_credible_delta_slope(:) = 0.0_dp
+
 
 ENDIF
 
@@ -182,7 +165,6 @@ ALLOCATE( discrete_history(discretise_size,NBINS) )
 ALLOCATE( pt(k_max_array_bound,2), pt_prop(k_max_array_bound,2)  )
 
 discrete_history(:,:) = 0
-CHANGE_POINTS(:) = 0
 val_min(:) = 0.0_dp
 val_max(:) = 0.0_dp
 ind_min(:) = 0
@@ -203,8 +185,7 @@ PA = 0
 P_sd = 0
 A_sd = 0
 AA = 0
-av_delta_slope(:) = 0.0_dp
-median_delta_slope(:) = 0.0_dp
+
 
 ! initial condition
 CALL RANDOM_NUMBER( RAND(1))
@@ -574,48 +555,19 @@ ENDIF !CALC_CREDIBLE
 N_changepoint_hist(k)=N_changepoint_hist(k) + 1
 
 
-!calculate the histogram on change points, adding a 1 to the bin if there is a change point.
-!Only allow at most one changepoint in any bin - this is so the bin count normalised by the number of models is the probability of a changepoint.  
-
-! Having found the correct bin, add in the absolute change in slope. NB away from a change point this is zero.
-! zero the update vector
-BIN_COUNT(1:time_intervals_nbins) = 0
-
-! This is the vector of delta_slope values for the current model
-delta_slope_current(:) = 0.0_dp
-
+! save change in slope and change points:
 DO i=1, k !loop over all change points
-DO j = 1, time_intervals_nbins
-    IF( pt(i,1) >= time_intervals_edges(j) .AND. pt(i,1) < time_intervals_edges(j+1) ) THEN  ! relevant bin found
-        BIN_COUNT(j) = 1
-
-! Find delta slope by using a small perturbation
-    X(1) = pt(i,1)
-    CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn)   !the function at a point x_n
-    X(1) = pt(i,1) + delta_time_slope
-    CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn_plus_1) !the function at a point x_{n+1}
-    X(1) = pt(i,1) - delta_time_slope
-    CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn_minus_1) !the function at a point x_{n-1}
-
-! Change in slope is approximated by abs(  f(x_{n+1}) - f(x_{n})/delta_time_slope  - ( f(x_n) - f(x_{n-1}) ) /delta_time_slope )
-
-
-        delta_slope_current(j) = delta_slope_current(j) + abs( (fn_plus_1(1) + fn_minus_1(1) - 2.0_dp * fn(1))/delta_time_slope )
-
-
-        EXIT  ! now try another change point
-    ENDIF
+! Find change in slope by using a small perturbation
+X(1) = pt(i,1)
+CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn)   !the function at a point x_n
+X(1) = pt(i,1) + delta_time_slope
+CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn_plus_1) !the function at a point x_{n+1}
+X(1) = pt(i,1) - delta_time_slope
+CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, 1, X, fn_minus_1) !the function at a point x_{n-1}
+size_jerk_data = size_jerk_data + 1
+jerk_data(size_jerk_data,1) = pt(i,1)
+jerk_data(size_jerk_data,2) = (fn_plus_1(1) + fn_minus_1(1) - 2.0_dp * fn(1))/delta_time_slope
 ENDDO
-ENDDO
-
-! Add in delta_slope information:
-av_delta_slope(:) = av_delta_slope(:) + delta_slope_current(:)
-
-! Save slope information 
-discretise_delta_slope(b,:) = delta_slope_current(:)
-
-! Add in the update to the bin counts
-CHANGE_POINTS(1:time_intervals_nbins) = CHANGE_POINTS(1:time_intervals_nbins) + BIN_COUNT(1:time_intervals_nbins)
 
 
 ENDIF !collect stats
@@ -624,8 +576,6 @@ enddo ! the Sampling of the mcmc
 
 ! Compute the average
 ENSEMBLE_AV(:)=ENSEMBLE_AV(:)/b
-
-av_delta_slope(:) = av_delta_slope(:) / b
 
 do i=1, discretise_size
 
@@ -650,33 +600,6 @@ enddo
 
 ! normalise marginal distributions
 MARGINAL_DENSITY(:,:) = REAL(discrete_history(:,:), KIND = dp)/ sum( discrete_history(1,:) )
-
-
-! Calculate median for delta_slope
-! For each bin, sort the data and find the median value
-
-ALLOCATE( order (Num_sampled_models)  )
-
-Do j = 1, time_intervals_nbins
-
-! Find the order that sorts the data
-order = rargsort(discretise_delta_slope(:,j) )
-
-median_delta_slope(j) = discretise_delta_slope(order( int(Num_sampled_models/2)),j) !median is 50% of the way along the ordered dataset.
-
-IF( CALC_CREDIBLE ) THEN
-lower_credible_delta_slope(j) = &
-            discretise_delta_slope(order( int(Num_sampled_models * (100.0_dp - credible)/200.0_dp)),j) !lower credible
-upper_credible_delta_slope(j) = &
-            discretise_delta_slope(order( int(Num_sampled_models * (100.0_dp + credible)/200.0_dp)),j) !upper credible 
-
-! Recall that 95% credible interval means that the tails are at 97.5% and 2.5%, i.e. (100-95)/200  and  0.95 + (100-95)/200 or (100 + 95)/200
-ENDIF
-
-
-ENDDO
-DEALLOCATE (order)
-
 
 
 RETURN
