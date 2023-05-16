@@ -8,7 +8,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import warnings
-sys.path.append( os.path.abspath('..') )
+#sys.path.append( os.path.abspath('..') )
+sys.path.append( os.path.abspath('/gpfs/users/livermore/jerk_finder/') )
 from jerks import jerks
 import chaosmagpy as cp
 
@@ -121,8 +122,8 @@ print ('Times (in years) of output', time )
 window_length = 400
 overlap = 50
 
-coeffs = coeffs[time <= 6000, :]
-time = time[time <= 6000]
+#coeffs = coeffs[time <= 8000, :]
+#time = time[time <= 8000]
 
 
 nproc = int(os.getenv("OMP_NUM_THREADS"))
@@ -188,6 +189,9 @@ def my_calc_par(thetaphi_g):
     size_jerk_data_stitch  = np.zeros( len(run_components) )
     jerk_data_stitch0, jerk_data_stitch1, jerk_data_stitch2 = np.empty(shape=[0, 2]), np.empty(shape=[0, 2]), np.empty(shape=[0, 2])
     
+    
+
+
     for cmpt in run_components:
     
         # Find min/max SV for whole timeseries
@@ -237,7 +241,7 @@ def my_calc_par(thetaphi_g):
             # ****************************************
             
             size_jerk_data = 0
-            jerk_data = np.zeros( K_MAX *(NSAMPLE-burn_in)//THIN,2),dtype=float )
+            jerk_data = np.zeros( ( K_MAX *(NSAMPLE-burn_in)//THIN,2),dtype=float )
 
             TIME_grid = np.linspace(TIMES_MIN, TIMES_MAX, discretise_size, endpoint=True)
 
@@ -248,7 +252,7 @@ def my_calc_par(thetaphi_g):
             MEDIAN = np.zeros(discretise_size,dtype=float)
             MODE = np.zeros(discretise_size,dtype=float)
             MARGINAL_DENSITY = np.zeros( (discretise_size,NBINS),dtype=float )
-            N_CP_hist = np.zeros( K_MAX, dtype=int)
+            N_CP_hist = np.zeros( K_MAX+1, dtype=int)  #indices 0...KMAX
             
 
             (Acceptance_rates, SUP, INF, AV, MEDIAN, MODE,
@@ -271,7 +275,7 @@ def my_calc_par(thetaphi_g):
                 jerk_data_stitch1 = np.vstack((jerk_data_stitch1[:,:],jerk_data[mask,:]))
             else:
                 jerk_data_stitch2 = np.vstack((jerk_data_stitch2[:,:],jerk_data[mask,:]))
-
+                
             size_jerk_data_stitch[cmpt] += len(mask)
 
             #print('Theta,phi {5:3.1f} {6:3.1f}; window index: {0:d}; acceptance rates: {1:3.1f}% {2:3.1f}% {3:3.1f}% #{4:3.1f}%'.\
@@ -289,8 +293,8 @@ def my_calc_par(thetaphi_g):
         else:
             data_timing, data_amplitude = jerk_data_stitch2[:,0], jerk_data_stitch2[:,1]
             
-    
-        number_time_bins = (TIMES_MAX - TIMES_MIN) * 2
+        TIMES_MAX, TIMES_MIN = int( time.max() ), int( time.min() )
+        number_time_bins = (TIMES_MAX - TIMES_MIN) * 2 #one bin per 6 months.
         number_amplitude_bins = 100
         time_range = [TIMES_MIN, TIMES_MAX]
         amplitude_range = [-50,50]

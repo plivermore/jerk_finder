@@ -36,7 +36,9 @@ MODULE Jerks
 !
 ! credible (integer): credible interval bounds for the model as percentage e.g. 95. A value of 0 means that credible intervals are not calculated.
 !
-! RUNNING_MODE: 1 indicates that the posterior is returned; otherwise the prior distribution is returned.
+! RUNNING_MODE: 0 indicates the prior distribution is returned (i.e. the likelihood is set to 1)
+!               1 indicates that the posterior is returned (normal operation of the function)
+!               2 indicates that the posterior is returned and the model information is captured in order to make an animation
 !
 ! **********
 ! OUTPUTS
@@ -60,7 +62,7 @@ MODULE Jerks
 
 ! jerk_data: 2D array of change in slope and the time of each changepoint, from the thinned Markov chain.
 ! (2D array, dimensions: max_size_jerk_data, 2). To make it easier to pass this information back to the Python calling routine,
-! this array is of pre-defined shape.
+! this array is of pre-defined size.
 
 ! jerk_data(:,1) are the times; jerk_data(:,2) are the changes in slope.
 ! The parameter max_size_jerk_data = K_MAX*(NSAMPLE -BURN_IN)/THIN, which is the maximum possible size.
@@ -68,6 +70,15 @@ MODULE Jerks
 
 ! size_jerk_data: an integer giving the number of changepoints stored in jerk_data.
 
+! model_history: array giving the (discretised) model of the chain every thinned iteration.
+! float, array, dimensions: discretise_size, (NSAMPLE -BURN_IN)/THIN
+! If RUNNING_MODE is not 2, this is never accessed.
+
+
+! jerk_history: vector giving the range of indices (start, end) of the jerk_data array corresponding to every thinned iteration.
+! array, 2D, integer, dimensions:  ((NSAMPLE -BURN_IN)/THIN, 2).
+! This can be used to build animations of the jerk statistics.
+! If RUNNING_MODE is not 2, this is never accessed.
 
 USE SORT
 USE SUBS
@@ -79,7 +90,7 @@ SUBROUTINE RJMCMC(sigmas, burn_in, NSAMPLE, NUM_DATA, TIMES, &
            THIN, NBINS, credible, RUNNING_MODE, &
            Acceptance_rates, CREDIBLE_SUP, CREDIBLE_INF, ENSEMBLE_AV, ENSEMBLE_MEDIAN, &
            ENSEMBLE_MODE, MARGINAL_DENSITY, &
-           N_changepoint_hist, jerk_data, size_jerk_data )
+           N_changepoint_hist, jerk_data, size_jerk_data, model_history, jerk_history )
 
 
 IMPLICIT NONE
@@ -96,7 +107,6 @@ integer, intent(in) :: NSAMPLE
 real(dp), intent(in) :: sigmas(3)
 
 
-
 ! OUTPUTS
 real(dp), intent(out) :: Acceptance_rates(4)
 REAL( KIND = dp), DIMENSION(1:discretise_size), intent(out) :: ENSEMBLE_AV, CREDIBLE_SUP, &
@@ -105,8 +115,14 @@ REAL( KIND = dp), DIMENSION(1:discretise_size), intent(out) :: ENSEMBLE_AV, CRED
 REAL( KIND = dp), intent(out) :: MARGINAL_DENSITY(discretise_size,NBINS)
 INTEGER, intent(out) :: N_changepoint_hist(K_MIN:K_MAX)
 
+! jerk analysis
 INTEGER, intent(out) :: size_jerk_data
 REAL( KIND = dp), intent(out) :: jerk_data( K_MAX * (NSAMPLE - BURN_IN)/THIN, 2)
+
+! information for making animations
+INTEGER, intent(out) :: jerk_history( (NSAMPLE - BURN_IN)/THIN,2)
+real(dp), intent(out) :: model_history(discretise_size,(NSAMPLE - BURN_IN)/THIN )
+
 
 ! Internal variables
 
@@ -228,16 +244,17 @@ ALLOCATE( interpolated_signal(max(NUM_DATA,discretise_size)) ) !generic output s
 CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, NUM_DATA, TIMES, interpolated_signal)
 
 ! Running mode
-IF( RUNNING_MODE .eq. 1) THEN
+IF( RUNNING_MODE .eq. 0) THEN
+!set likelihood as 1. The prior distribution is then returned.
+like = 1.0_dp
 
+ELSE
 !compute likelihood based on normal distribution
 do i=1,NUM_DATA
 like=like+(Y(i) - interpolated_signal(i))**2/(2.0_8 * delta_Y(i)**2)
 enddo
 
-ELSE !set likelihood as 1. The prior distribution is then returned.
-like = 1.0_dp
-endif
+ENDIF
 
 like_init=like
 
@@ -413,14 +430,16 @@ if (out == 1)  then
 like_prop = 0.0_dp
 CALL Find_linear_interpolated_values( k_prop, TIMES_min, TIMES_max, pt_prop, endpt_prop, NUM_DATA, TIMES, interpolated_signal)
 
-IF( RUNNING_MODE .eq. 1) THEN
+IF( RUNNING_MODE .eq. 0) THEN
+like_prop = 1.0_dp
+ELSE
+
 do i=1,NUM_DATA
 like_prop=like_prop+(Y(i) - interpolated_signal(i))**2/(2.0_dp * delta_Y(i)**2)
 enddo
 
-else
-like_prop = 1.0_dp
-endif
+ENDIF
+
 
 endif !if (out==1)
 
@@ -490,6 +509,8 @@ b = b + 1
 CALL Find_linear_interpolated_values( k, TIMES_min, TIMES_max, pt, endpt, discretise_size, &
 TIME(1:discretise_size), interpolated_signal)
 
+! save model for animation
+model_history(1:discretise_size,b) = interpolated_signal
 
 ! build the sum of the models to calculate the average
 ENSEMBLE_AV(:)=ENSEMBLE_AV(:)+interpolated_signal(1:discretise_size)
@@ -554,7 +575,7 @@ ENDIF !CALC_CREDIBLE
 ! Build histogram of number of changepoints: k
 N_changepoint_hist(k)=N_changepoint_hist(k) + 1
 
-
+jerk_history(b,1) = size_jerk_data + 1
 ! save change in slope and change points:
 DO i=1, k !loop over all change points
 ! Find change in slope by using a small perturbation
@@ -569,6 +590,8 @@ jerk_data(size_jerk_data,1) = pt(i,1)
 jerk_data(size_jerk_data,2) = (fn_plus_1(1) + fn_minus_1(1) - 2.0_dp * fn(1))/delta_time_slope
 ENDDO
 
+! collect jerk index for animations:
+jerk_history(b,2) = size_jerk_data
 
 ENDIF !collect stats
 
