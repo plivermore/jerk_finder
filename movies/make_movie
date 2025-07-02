@@ -1,4 +1,0 @@
-ffmpeg  -framerate 5 -pattern_type glob -i 'Jerk9*.png'  -c:v libx264 -r 30 -pix_fmt yuv420p -vf scale=1280:-2 Jerk9_Br.mp4 
-#ffmpeg  -framerate 15 -pattern_type glob -i 'Jerk9*.png'  -c:v libx264 -pix_fmt yuv420p -s 1920x1080 Jerk9_fast.mp4
-
-#ffmpeg  -framerate 5 -pattern_type glob -i 'Jerk6*.png'  -c:v libx264 -r 30 -pix_fmt yuv420p -vf scale=1280:-2 Jerk6_Br.mp4 
