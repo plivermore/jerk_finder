@@ -1,3 +1,63 @@
-gfortran -c Fortran/sort.F90
-gfortran -c Fortran/subs.F90
-f2py -c Fortran/Jerks.F90 sort.o subs.o -m jerks
+# This install script requires a fortran compiler and numpy.
+# The latest version of Numpy requires meson.
+
+# You might need to create a new environment using something like:
+# conda create -n jerks numpy meson conda-forge::gfortran
+
+#!/bin/bash
+
+# Set the fortran compiler and compiler flags:
+FC='gfortran'
+FFLAGS='-O2 -fPIC'
+
+# Set the build directory:
+BUILD_DIR='./build'
+
+# Remove any existing library file:
+\rm -f jerks*.so
+
+# Create build directory,
+# compile fortran files,
+# create 'libjerks.a' from compiled fortran files,
+# create python library using f2py,
+# then clean up build directory:
+mkdir -p ${BUILD_DIR}
+${FC} \
+  ${FFLAGS} \
+  -c Fortran/sort.F90 && \
+${FC} \
+  ${FFLAGS} \
+  -c Fortran/subs.F90 && \
+ar \
+  -rs \
+  libjerks.a \
+  sort.o \
+  subs.o && \
+f2py \
+  --f90exec="${FC}" \
+  --f90flags="${FFLAGS}" \
+  --build-dir ${BUILD_DIR} \
+  -c \
+  -m jerks \
+  -I. -I../.. \
+  Fortran/Jerks.F90 \
+  -L. -L../.. \
+  -ljerks && \
+\rm -fr \
+  ${BUILD_DIR}/bbdir \
+  ${BUILD_DIR}/build \
+  ${BUILD_DIR}/Fortran \
+  ${BUILD_DIR}/jerk* \
+  ${BUILD_DIR}/Jerk* \
+  ${BUILD_DIR}/meson* \
+  ${BUILD_DIR}/src* && \
+rmdir ${BUILD_DIR}
+
+# Tidy up:
+\rm -f \
+ sort.o \
+ sort.mod \
+ subs.o \
+ subs.mod \
+ libjerks.a
+

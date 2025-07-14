@@ -1,0 +1,6 @@
+This folder contains Python scripts that are designed to be run from the command line to find jerks on a lat/long grid.
+The algorithm is parallelised, and you will need to set the environment variable
+OMP_NUM_THREADS appropriately.
+
+e.g. (in bash)
+export OMP_NUM_THREADS=4

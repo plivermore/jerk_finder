@@ -3,7 +3,7 @@
 This code implements a jerk-finding algorithm based on Bayesian piecewise-linear fitting to timeseries of secular variation.
 
 The kernel of the code is written in Fortran 90 for speed, but is callable from Python.
-The repository includes several Jupyter notebooks that show how the code can be applied to both simple examples, geomagnetic and numerically simulated datasets. 
+The repository includes several Jupyter notebooks that show how the code can be applied to simple synthetic examples and geomagnetic datasets. 
 
 To install, you need f2py (part of the standard numpy installation) to compile the Fortran code and create a Python interface.
 
